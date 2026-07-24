@@ -310,6 +310,47 @@ th {
   color: var(--muted);
   padding: 40px 0;
 }
+
+/* Tabla de estados (sin procesar / en ganchera / procesado) */
+.detalle-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+.detalle-head button {
+  border: 1px solid var(--border);
+}
+table.estados {
+  width: 100%;
+  border-collapse: collapse;
+}
+table.estados th {
+  font-size: 12px;
+  text-transform: none;
+  padding: 6px 8px;
+}
+table.estados th:not(:first-child) {
+  text-align: center;
+  width: 38%;
+}
+table.estados td {
+  padding: 6px 6px;
+  border-bottom: 1px solid var(--border);
+  vertical-align: middle;
+}
+.cell-input {
+  width: 100%;
+  padding: 8px 10px;
+  text-align: right;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  font-size: 15px;
+}
+.cell-input:focus {
+  outline: none;
+  border-color: var(--primary);
+}
 .preview-scroll {
   max-height: 320px;
   overflow: auto;

@@ -88,8 +88,9 @@ export default function SupplierCount() {
       <div className="card">
         <p className="muted" style={{ marginTop: 0 }}>
           Para cada pieza, marcá si el stock que figura es <strong>Correcto</strong> o{' '}
-          <strong>Incorrecto</strong>. Si es incorrecto, cargá cuánto tenés realmente, separando lo{' '}
-          <strong>sin procesar</strong> (crudo) de lo <strong>procesado</strong>.
+          <strong>Incorrecto</strong>. Si es incorrecto, cargá cuánto tenés realmente en la tabla,
+          separando <strong>sin procesar</strong> (crudo), <strong>en ganchera</strong> (en proceso) y{' '}
+          <strong>procesado</strong>. Podés cargar en cajón o en kg (se convierte solo).
         </p>
       </div>
 
@@ -186,40 +187,45 @@ function ItemCard({ token, item, disabled, onLocalChange, onError }) {
     save({ [field]: value === '' ? null : value });
   }
 
-  // Función (no componente) para no remontar y perder el foco al tipear.
-  const grupo = (label, color, prefix) => {
-    return (
-      <div key={prefix}>
-        <div className="subt" style={{ color }}>{label}</div>
-        <div className="row">
-          <div className="field">
-            <label>Cajones</label>
-            <input
-              type="number"
-              step="any"
-              inputMode="decimal"
-              value={item[`${prefix}_cajon`] ?? ''}
-              disabled={disabled}
-              onChange={(e) => onCajon(prefix, e.target.value)}
-              onBlur={() => blurPair(prefix)}
-            />
-          </div>
-          <div className="field">
-            <label>Kg</label>
-            <input
-              type="number"
-              step="any"
-              inputMode="decimal"
-              value={item[`${prefix}_kg`] ?? ''}
-              disabled={disabled}
-              onChange={(e) => onKg(prefix, e.target.value)}
-              onBlur={() => blurPair(prefix)}
-            />
-          </div>
-        </div>
-      </div>
-    );
-  };
+  // Pone en 0 todos los estados (cajones y kg).
+  function ponerEnCero() {
+    save({
+      sp_cajon: 0, sp_kg: 0,
+      gn_cajon: 0, gn_kg: 0,
+      pr_cajon: 0, pr_kg: 0,
+    });
+  }
+
+  // Fila de la tabla de estados. Función (no componente) para no perder el foco.
+  const fila = (label, color, prefix) => (
+    <tr key={prefix}>
+      <td style={{ fontWeight: 600, color, whiteSpace: 'nowrap' }}>{label}</td>
+      <td>
+        <input
+          className="cell-input"
+          type="number"
+          step="any"
+          inputMode="decimal"
+          value={item[`${prefix}_cajon`] ?? ''}
+          disabled={disabled}
+          onChange={(e) => onCajon(prefix, e.target.value)}
+          onBlur={() => blurPair(prefix)}
+        />
+      </td>
+      <td>
+        <input
+          className="cell-input"
+          type="number"
+          step="any"
+          inputMode="decimal"
+          value={item[`${prefix}_kg`] ?? ''}
+          disabled={disabled}
+          onChange={(e) => onKg(prefix, e.target.value)}
+          onBlur={() => blurPair(prefix)}
+        />
+      </td>
+    </tr>
+  );
 
   return (
     <div className={`item ${item.estado || ''}`}>
@@ -256,22 +262,38 @@ function ItemCard({ token, item, disabled, onLocalChange, onError }) {
 
       {item.estado === 'incorrecto' && (
         <div className="detalle">
-          <div className="subt">¿Cuánto tenés realmente?</div>
+          <div className="detalle-head">
+            <div className="subt" style={{ margin: 0 }}>¿Cuánto tenés realmente?</div>
+            <button className="ghost small" onClick={ponerEnCero} disabled={disabled}>
+              En Cero
+            </button>
+          </div>
           {factor && factor > 0 ? (
-            <div className="muted" style={{ marginBottom: 8 }}>
-              Podés cargar en cajones o en kg: se convierte solo (1 cajón = {round3(factor)} kg).
+            <div className="muted" style={{ margin: '4px 0 8px' }}>
+              Cargá en cajones o en kg: se convierte solo (1 cajón = {round3(factor)} kg).
             </div>
           ) : (
-            <div className="muted" style={{ marginBottom: 8 }}>
+            <div className="muted" style={{ margin: '4px 0 8px' }}>
               Cargá en cajones y/o en kg.
             </div>
           )}
 
-          {grupo('Sin procesar (crudo)', 'var(--amber)', 'sp')}
-          {grupo('En gancho (en proceso)', 'var(--primary)', 'gn')}
-          {grupo('Procesado', 'var(--green)', 'pr')}
+          <table className="estados">
+            <thead>
+              <tr>
+                <th>Estado</th>
+                <th>Cajón</th>
+                <th>KG</th>
+              </tr>
+            </thead>
+            <tbody>
+              {fila('Sin procesar', 'var(--amber)', 'sp')}
+              {fila('En Ganchera', 'var(--primary)', 'gn')}
+              {fila('Procesado', 'var(--green)', 'pr')}
+            </tbody>
+          </table>
 
-          <div className="field">
+          <div className="field" style={{ marginTop: 10 }}>
             <label>Comentario (opcional)</label>
             <input
               type="text"

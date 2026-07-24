@@ -98,7 +98,7 @@ export default function AdminResults() {
                 <th>Stock online</th>
                 <th>Estado</th>
                 <th>Sin procesar</th>
-                <th>En gancho</th>
+                <th>En Ganchera</th>
                 <th>Procesado</th>
                 <th>Comentario</th>
               </tr>
@@ -158,8 +158,8 @@ function buildCsv(items) {
     'Estado',
     'Sin Procesar Cajón',
     'Sin Procesar KG',
-    'En Gancho Cajón',
-    'En Gancho KG',
+    'En Ganchera Cajón',
+    'En Ganchera KG',
     'Procesado Cajón',
     'Procesado KG',
     'Comentario',
