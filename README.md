@@ -32,7 +32,7 @@ Flujo:
 2. Cada push a la rama del proyecto (o a `main`) dispara el workflow
    `.github/workflows/deploy.yml`, que compila y publica.
 3. La app queda en:
-   **https://loekemeyer.github.io/Contrlol-Proveedores/**
+   **https://loekemeyer.github.io/Control-Proveedores/**
 
 > Si cambia el nombre del repo, actualizá `base` en `vite.config.js`
 > (debe ser `/<nombre-del-repo>/`).
@@ -50,7 +50,7 @@ update public.cp_config set value = 'NUEVA_CLAVE' where key = 'admin_secret';
 
 ```bash
 npm install
-npm run dev       # http://localhost:5173/Contrlol-Proveedores/
+npm run dev       # http://localhost:5173/Control-Proveedores/
 ```
 
 La configuración de Supabase (URL + clave pública) está en
