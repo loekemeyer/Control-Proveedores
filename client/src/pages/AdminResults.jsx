@@ -98,6 +98,7 @@ export default function AdminResults() {
                 <th>Stock online</th>
                 <th>Estado</th>
                 <th>Sin procesar</th>
+                <th>En gancho</th>
                 <th>Procesado</th>
                 <th>Comentario</th>
               </tr>
@@ -113,6 +114,7 @@ export default function AdminResults() {
                     <EstadoTag estado={it.estado} />
                   </td>
                   <td>{it.estado === 'incorrecto' ? cantidad(it.sp_cajon, it.sp_kg) : '—'}</td>
+                  <td>{it.estado === 'incorrecto' ? cantidad(it.gn_cajon, it.gn_kg) : '—'}</td>
                   <td>{it.estado === 'incorrecto' ? cantidad(it.pr_cajon, it.pr_kg) : '—'}</td>
                   <td className="muted">{it.comentario || ''}</td>
                 </tr>
@@ -156,6 +158,8 @@ function buildCsv(items) {
     'Estado',
     'Sin Procesar Cajón',
     'Sin Procesar KG',
+    'En Gancho Cajón',
+    'En Gancho KG',
     'Procesado Cajón',
     'Procesado KG',
     'Comentario',
@@ -170,6 +174,8 @@ function buildCsv(items) {
         it.estado || 'sin responder',
         num(it.sp_cajon),
         num(it.sp_kg),
+        num(it.gn_cajon),
+        num(it.gn_kg),
         num(it.pr_cajon),
         num(it.pr_kg),
         it.comentario || '',

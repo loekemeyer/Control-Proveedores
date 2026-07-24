@@ -329,6 +329,7 @@ function ImportWizard({ onCreated }) {
                   <th>Descripción Parte</th>
                   <th>Cajón online</th>
                   <th>KG online</th>
+                  <th>Kg/cajón</th>
                 </tr>
               </thead>
               <tbody>
@@ -338,6 +339,7 @@ function ImportWizard({ onCreated }) {
                     <td>{it.descripcion}</td>
                     <td>{it.stock_cajon ?? '—'}</td>
                     <td>{it.stock_kg ?? '—'}</td>
+                    <td>{it.kg_x_cajon ?? '—'}</td>
                   </tr>
                 ))}
               </tbody>

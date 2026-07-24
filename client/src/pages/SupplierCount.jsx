@@ -118,17 +118,20 @@ export default function SupplierCount() {
   );
 }
 
+function round3(n) {
+  return Math.round(n * 1000) / 1000;
+}
+function toNumOrNull(v) {
+  if (v === '' || v === null || v === undefined) return null;
+  const n = Number(v);
+  return Number.isFinite(n) ? n : null;
+}
+
 function ItemCard({ token, item, disabled, onLocalChange, onError }) {
   const [saving, setSaving] = useState(false);
   const [savedAt, setSavedAt] = useState(false);
 
-  const detalle = {
-    sp_cajon: item.sp_cajon ?? '',
-    sp_kg: item.sp_kg ?? '',
-    pr_cajon: item.pr_cajon ?? '',
-    pr_kg: item.pr_kg ?? '',
-    comentario: item.comentario ?? '',
-  };
+  const factor = toNumOrNull(item.kg_x_cajon); // kg por cajón (del Excel)
 
   // Guarda SOLO los campos del patch (update parcial). Evita pisar con datos viejos.
   async function save(patch) {
@@ -148,27 +151,75 @@ function ItemCard({ token, item, disabled, onLocalChange, onError }) {
 
   function setEstado(estado) {
     if (estado === 'correcto') {
-      // Reflejar el borrado de cantidades localmente.
       onLocalChange(item.id, {
-        sp_cajon: null,
-        sp_kg: null,
-        pr_cajon: null,
-        pr_kg: null,
+        sp_cajon: null, sp_kg: null,
+        gn_cajon: null, gn_kg: null,
+        pr_cajon: null, pr_kg: null,
         comentario: null,
       });
     }
     save({ estado });
   }
-  function setField(field, value) {
-    onLocalChange(item.id, { [field]: value });
+
+  // Al escribir cajones, autocompleta kg (y viceversa) usando el factor.
+  function onCajon(prefix, raw) {
+    const patch = { [`${prefix}_cajon`]: raw };
+    if (factor && factor > 0) {
+      patch[`${prefix}_kg`] = raw === '' ? '' : round3(Number(raw) * factor);
+    }
+    onLocalChange(item.id, patch);
   }
-  function blurField(field, value) {
-    const num = value === '' ? null : Number(value);
-    save({ [field]: Number.isFinite(num) ? num : null });
+  function onKg(prefix, raw) {
+    const patch = { [`${prefix}_kg`]: raw };
+    if (factor && factor > 0) {
+      patch[`${prefix}_cajon`] = raw === '' ? '' : round3(Number(raw) / factor);
+    }
+    onLocalChange(item.id, patch);
+  }
+  function blurPair(prefix) {
+    save({
+      [`${prefix}_cajon`]: toNumOrNull(item[`${prefix}_cajon`]),
+      [`${prefix}_kg`]: toNumOrNull(item[`${prefix}_kg`]),
+    });
   }
   function blurText(field, value) {
     save({ [field]: value === '' ? null : value });
   }
+
+  // Función (no componente) para no remontar y perder el foco al tipear.
+  const grupo = (label, color, prefix) => {
+    return (
+      <div key={prefix}>
+        <div className="subt" style={{ color }}>{label}</div>
+        <div className="row">
+          <div className="field">
+            <label>Cajones</label>
+            <input
+              type="number"
+              step="any"
+              inputMode="decimal"
+              value={item[`${prefix}_cajon`] ?? ''}
+              disabled={disabled}
+              onChange={(e) => onCajon(prefix, e.target.value)}
+              onBlur={() => blurPair(prefix)}
+            />
+          </div>
+          <div className="field">
+            <label>Kg</label>
+            <input
+              type="number"
+              step="any"
+              inputMode="decimal"
+              value={item[`${prefix}_kg`] ?? ''}
+              disabled={disabled}
+              onChange={(e) => onKg(prefix, e.target.value)}
+              onBlur={() => blurPair(prefix)}
+            />
+          </div>
+        </div>
+      </div>
+    );
+  };
 
   return (
     <div className={`item ${item.estado || ''}`}>
@@ -206,67 +257,28 @@ function ItemCard({ token, item, disabled, onLocalChange, onError }) {
       {item.estado === 'incorrecto' && (
         <div className="detalle">
           <div className="subt">¿Cuánto tenés realmente?</div>
+          {factor && factor > 0 ? (
+            <div className="muted" style={{ marginBottom: 8 }}>
+              Podés cargar en cajones o en kg: se convierte solo (1 cajón = {round3(factor)} kg).
+            </div>
+          ) : (
+            <div className="muted" style={{ marginBottom: 8 }}>
+              Cargá en cajones y/o en kg.
+            </div>
+          )}
 
-          <div className="subt" style={{ color: 'var(--amber)' }}>Sin procesar (crudo)</div>
-          <div className="row">
-            <div className="field">
-              <label>Cajones</label>
-              <input
-                type="number"
-                step="any"
-                value={detalle.sp_cajon}
-                disabled={disabled}
-                onChange={(e) => setField('sp_cajon', e.target.value)}
-                onBlur={(e) => blurField('sp_cajon', e.target.value)}
-              />
-            </div>
-            <div className="field">
-              <label>Kg</label>
-              <input
-                type="number"
-                step="any"
-                value={detalle.sp_kg}
-                disabled={disabled}
-                onChange={(e) => setField('sp_kg', e.target.value)}
-                onBlur={(e) => blurField('sp_kg', e.target.value)}
-              />
-            </div>
-          </div>
-
-          <div className="subt" style={{ color: 'var(--green)' }}>Procesado</div>
-          <div className="row">
-            <div className="field">
-              <label>Cajones</label>
-              <input
-                type="number"
-                step="any"
-                value={detalle.pr_cajon}
-                disabled={disabled}
-                onChange={(e) => setField('pr_cajon', e.target.value)}
-                onBlur={(e) => blurField('pr_cajon', e.target.value)}
-              />
-            </div>
-            <div className="field">
-              <label>Kg</label>
-              <input
-                type="number"
-                step="any"
-                value={detalle.pr_kg}
-                disabled={disabled}
-                onChange={(e) => setField('pr_kg', e.target.value)}
-                onBlur={(e) => blurField('pr_kg', e.target.value)}
-              />
-            </div>
-          </div>
+          {grupo('Sin procesar (crudo)', 'var(--amber)', 'sp')}
+          {grupo('En gancho (en proceso)', 'var(--primary)', 'gn')}
+          {grupo('Procesado', 'var(--green)', 'pr')}
 
           <div className="field">
             <label>Comentario (opcional)</label>
             <input
               type="text"
-              value={detalle.comentario}
+              value={item.comentario ?? ''}
               disabled={disabled}
               placeholder="Aclaración…"
-              onChange={(e) => setField('comentario', e.target.value)}
+              onChange={(e) => onLocalChange(item.id, { comentario: e.target.value })}
               onBlur={(e) => blurText('comentario', e.target.value)}
             />
           </div>

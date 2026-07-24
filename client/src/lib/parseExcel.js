@@ -42,11 +42,15 @@ function parseSheet(rows) {
     let descCol = -1;
     let cajonCol = -1;
     let kgCol = -1;
+    let kgxCajonCol = -1;
 
     for (let c = 0; c < row.length; c++) {
       const val = norm(row[c]);
       if (val === 'descripcion parte' && descCol === -1) descCol = c;
       if (/^cajon\s+\S/.test(val) && cajonCol === -1) cajonCol = c;
+      // Factor de conversión "kg x cajon" (col CB en Pedernera). NO confundir
+      // con "kg x uni".
+      if (val === 'kg x cajon' && kgxCajonCol === -1) kgxCajonCol = c;
     }
     if (descCol === -1 || cajonCol === -1) continue;
 
@@ -59,10 +63,15 @@ function parseSheet(rows) {
       const desc = String(drow[descCol] ?? '').trim();
       if (!desc) continue;
       if (norm(desc) === 'descripcion parte') continue;
+      const stock_cajon = toNumber(drow[cajonCol]);
+      const stock_kg = kgCol !== -1 ? toNumber(drow[kgCol]) : null;
+      // Solo items con stock (cajones o kg distintos de 0).
+      if (!stock_cajon && !stock_kg) continue;
       items.push({
         descripcion: desc,
-        stock_cajon: toNumber(drow[cajonCol]),
-        stock_kg: kgCol !== -1 ? toNumber(drow[kgCol]) : null,
+        stock_cajon,
+        stock_kg,
+        kg_x_cajon: kgxCajonCol !== -1 ? toNumber(drow[kgxCajonCol]) : null,
       });
     }
     return { items };

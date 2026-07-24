@@ -11,7 +11,10 @@ Flujo:
 2. Genera un **link único** por proveedor.
 3. **El proveedor** abre el link (sin usuario/contraseña) y, pieza por pieza,
    marca **Correcto** o **Incorrecto**. Si es **Incorrecto**, carga cuánto tiene
-   realmente, separado en **sin procesar** (crudo) y **procesado**, en cajones y kg.
+   realmente, separado en **sin procesar** (crudo), **en gancho** (en proceso) y
+   **procesado**. Puede cargar en **cajones o en kg**: se convierte solo usando el
+   **kg × cajón** del Excel.
+   Solo se muestran los items con stock (cajones o kg distintos de 0).
 4. **El admin** ve los resultados, las diferencias y **exporta un CSV**.
 
 ## Arquitectura
@@ -60,8 +63,9 @@ seguridad la dan RLS + las funciones RPC.
 ## Base de datos (resumen del esquema aislado)
 
 - `cp_sessions` — un conteo por proveedor (con `token` y `status`).
-- `cp_items` — items del conteo (descripción, stock online) + respuesta del
-  proveedor (`estado`, `sp_*` sin procesar, `pr_*` procesado, `comentario`).
+- `cp_items` — items del conteo (descripción, stock online, `kg_x_cajon`) +
+  respuesta del proveedor (`estado`, `sp_*` sin procesar, `gn_*` en gancho,
+  `pr_*` procesado, `comentario`).
 - `cp_config` — configuración (`admin_secret`).
 - Funciones: `cp_admin_login`, `cp_admin_create_session`,
   `cp_admin_list_sessions`, `cp_admin_get_session`, `cp_admin_delete_session`,
