@@ -1,6 +1,6 @@
 import * as XLSX from 'xlsx';
 
-// Normaliza texto: saca acentos, espacios y pasa a minusculas.
+// Normaliza texto: saca acentos, espacios y pasa a minúsculas.
 function norm(s) {
   return String(s ?? '')
     .normalize('NFD')
@@ -20,60 +20,7 @@ function toNumber(v) {
   return Math.round(n * 1000) / 1000;
 }
 
-// Analiza una hoja y detecta la fila de encabezado y las columnas de
-// "Descripción Parte" y del stock online ("Cajon <Prov>" / "KG <Prov>").
-// Devuelve null si la hoja no parece ser de un proveedor.
-function parseSheet(rows) {
-  const scanLimit = Math.min(rows.length, 15);
-  for (let r = 0; r < scanLimit; r++) {
-    const row = rows[r] || [];
-    let descCol = -1;
-    let cajonCol = -1;
-    let kgCol = -1;
-
-    for (let c = 0; c < row.length; c++) {
-      const val = norm(row[c]);
-      if (val === 'descripcion parte' && descCol === -1) descCol = c;
-      // "Cajon <algo>" (ej. "Cajon Pedernera"), NO "Conteo Cajon" ni "Envio Cajon".
-      if (/^cajon\s+\S/.test(val) && cajonCol === -1) cajonCol = c;
-    }
-
-    if (descCol === -1 || cajonCol === -1) continue;
-
-    // La columna KG del stock online suele estar pegada a la derecha del cajon.
-    const rightVal = norm(row[cajonCol + 1]);
-    if (/^kg\b/.test(rightVal)) kgCol = cajonCol + 1;
-
-    const supplierGuess = String(row[cajonCol]).replace(/cajon/i, '').trim();
-
-    // Leer los items debajo del encabezado.
-    const items = [];
-    for (let dr = r + 1; dr < rows.length; dr++) {
-      const drow = rows[dr] || [];
-      const descRaw = drow[descCol];
-      const desc = String(descRaw ?? '').trim();
-      if (!desc) continue;
-      if (norm(desc) === 'descripcion parte') continue; // encabezado repetido
-      items.push({
-        descripcion: desc,
-        stock_cajon: toNumber(drow[cajonCol]),
-        stock_kg: kgCol !== -1 ? toNumber(drow[kgCol]) : null,
-      });
-    }
-
-    return {
-      headerRow: r,
-      descCol,
-      cajonCol,
-      kgCol,
-      supplierGuess,
-      items,
-    };
-  }
-  return null;
-}
-
-// Hojas utilitarias que NO son proveedores (aunque tengan estructura parecida).
+// Hojas utilitarias que NO son proveedores.
 const EXCLUDED_SHEETS = new Set([
   'conteo sp',
   'conteo sc',
@@ -87,9 +34,45 @@ const EXCLUDED_SHEETS = new Set([
   'hoja2',
 ]);
 
-// Parsea el workbook completo y devuelve solo las hojas que parecen de proveedor.
-export function parseWorkbook(buffer) {
-  const wb = XLSX.read(buffer, { type: 'buffer' });
+// Detecta la fila de encabezado y las columnas de descripción y stock online.
+function parseSheet(rows) {
+  const scanLimit = Math.min(rows.length, 15);
+  for (let r = 0; r < scanLimit; r++) {
+    const row = rows[r] || [];
+    let descCol = -1;
+    let cajonCol = -1;
+    let kgCol = -1;
+
+    for (let c = 0; c < row.length; c++) {
+      const val = norm(row[c]);
+      if (val === 'descripcion parte' && descCol === -1) descCol = c;
+      if (/^cajon\s+\S/.test(val) && cajonCol === -1) cajonCol = c;
+    }
+    if (descCol === -1 || cajonCol === -1) continue;
+
+    const rightVal = norm(row[cajonCol + 1]);
+    if (/^kg\b/.test(rightVal)) kgCol = cajonCol + 1;
+
+    const items = [];
+    for (let dr = r + 1; dr < rows.length; dr++) {
+      const drow = rows[dr] || [];
+      const desc = String(drow[descCol] ?? '').trim();
+      if (!desc) continue;
+      if (norm(desc) === 'descripcion parte') continue;
+      items.push({
+        descripcion: desc,
+        stock_cajon: toNumber(drow[cajonCol]),
+        stock_kg: kgCol !== -1 ? toNumber(drow[kgCol]) : null,
+      });
+    }
+    return { items };
+  }
+  return null;
+}
+
+// Parsea un ArrayBuffer (archivo .xlsx) y devuelve las hojas de proveedor.
+export function parseWorkbook(arrayBuffer) {
+  const wb = XLSX.read(arrayBuffer, { type: 'array' });
   const suppliers = [];
   for (const sheetName of wb.SheetNames) {
     if (EXCLUDED_SHEETS.has(norm(sheetName))) continue;
@@ -105,7 +88,6 @@ export function parseWorkbook(buffer) {
     if (parsed && parsed.items.length > 0) {
       suppliers.push({
         sheet: sheetName,
-        supplierGuess: parsed.supplierGuess || sheetName,
         itemCount: parsed.items.length,
         items: parsed.items,
       });

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { api, getAdminPassword } from '../api.js';
+import { api, getAdminSecret } from '../api.js';
 
 export default function AdminResults() {
   const { id } = useParams();
@@ -11,9 +11,9 @@ export default function AdminResults() {
 
   async function load() {
     try {
-      const data = await api.getSession(id);
+      const data = await api.getSession(Number(id));
       setSession(data.session);
-      setItems(data.items);
+      setItems(data.items || []);
     } catch (err) {
       setError(err.message);
     } finally {
@@ -24,21 +24,18 @@ export default function AdminResults() {
     load();
   }, [id]);
 
-  async function download() {
-    try {
-      const blob = await api.exportCsv(id);
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `conteo_${session.supplier_name}_${id}.csv`;
-      a.click();
-      URL.revokeObjectURL(url);
-    } catch (err) {
-      setError(err.message);
-    }
+  function download() {
+    const csv = buildCsv(items);
+    const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `conteo_${slug(session.supplier_name)}_${id}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
   }
 
-  if (!getAdminPassword())
+  if (!getAdminSecret())
     return (
       <div className="container">
         <div className="card">
@@ -148,4 +145,53 @@ function cantidad(cajon, kg) {
   if (cajon !== null && cajon !== undefined) parts.push(`${cajon} cj`);
   if (kg !== null && kg !== undefined) parts.push(`${kg} kg`);
   return parts.length ? parts.join(' · ') : '0';
+}
+
+// --- Exportación CSV (para Excel argentino: separador ';' y coma decimal) ---
+function buildCsv(items) {
+  const headers = [
+    'Descripción Parte',
+    'Stock Online Cajón',
+    'Stock Online KG',
+    'Estado',
+    'Sin Procesar Cajón',
+    'Sin Procesar KG',
+    'Procesado Cajón',
+    'Procesado KG',
+    'Comentario',
+  ];
+  const lines = [headers.join(';')];
+  for (const it of items) {
+    lines.push(
+      [
+        it.descripcion,
+        num(it.stock_cajon),
+        num(it.stock_kg),
+        it.estado || 'sin responder',
+        num(it.sp_cajon),
+        num(it.sp_kg),
+        num(it.pr_cajon),
+        num(it.pr_kg),
+        it.comentario || '',
+      ]
+        .map(cell)
+        .join(';')
+    );
+  }
+  return lines.join('\r\n');
+}
+function num(n) {
+  if (n === null || n === undefined) return '';
+  return String(n).replace('.', ',');
+}
+function cell(v) {
+  const s = String(v ?? '');
+  return /[";\n\r]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
+}
+function slug(s) {
+  return String(s || 'conteo')
+    .normalize('NFD')
+    .replace(/[̀-ͯ]/g, '')
+    .replace(/[^a-zA-Z0-9]+/g, '_')
+    .toLowerCase();
 }

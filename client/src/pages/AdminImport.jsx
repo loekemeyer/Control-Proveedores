@@ -1,9 +1,16 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { api, getAdminPassword, setAdminPassword, clearAdminPassword } from '../api.js';
+import { api, getAdminSecret, setAdminSecret, clearAdminSecret } from '../api.js';
+import { parseWorkbook } from '../lib/parseExcel.js';
+
+// Arma el link del proveedor respetando el base de GitHub Pages y el HashRouter.
+function supplierLink(token) {
+  const base = import.meta.env.BASE_URL || '/';
+  return `${window.location.origin}${base}#/c/${token}`;
+}
 
 export default function AdminImport() {
-  const [authed, setAuthed] = useState(!!getAdminPassword());
+  const [authed, setAuthed] = useState(!!getAdminSecret());
   return authed ? (
     <AdminPanel onLogout={() => setAuthed(false)} />
   ) : (
@@ -21,10 +28,11 @@ function Login({ onOk }) {
     setLoading(true);
     setError('');
     try {
+      setAdminSecret(pass);
       await api.login(pass);
-      setAdminPassword(pass);
       onOk();
     } catch (err) {
+      clearAdminSecret();
       setError(err.message);
     } finally {
       setLoading(false);
@@ -41,7 +49,7 @@ function Login({ onOk }) {
         <form onSubmit={submit}>
           {error && <div className="error">{error}</div>}
           <div className="field">
-            <label>Contraseña</label>
+            <label>Clave de acceso</label>
             <input
               type="password"
               value={pass}
@@ -64,12 +72,12 @@ function AdminPanel({ onLogout }) {
   async function load() {
     setLoading(true);
     try {
-      const { sessions } = await api.listSessions();
-      setSessions(sessions);
+      const rows = await api.listSessions();
+      setSessions(rows || []);
       setError('');
     } catch (err) {
-      if (err.status === 401) {
-        clearAdminPassword();
+      if (/autoriz/i.test(err.message)) {
+        clearAdminSecret();
         onLogout();
         return;
       }
@@ -83,7 +91,7 @@ function AdminPanel({ onLogout }) {
   }, []);
 
   function logout() {
-    clearAdminPassword();
+    clearAdminSecret();
     onLogout();
   }
 
@@ -132,7 +140,7 @@ function AdminPanel({ onLogout }) {
 }
 
 function SessionRow({ s, onChange }) {
-  const link = `${window.location.origin}/c/${s.token}`;
+  const link = supplierLink(s.token);
   const [copied, setCopied] = useState(false);
 
   async function copy() {
@@ -205,10 +213,16 @@ function ImportWizard({ onCreated }) {
     setLoading(true);
     setError('');
     try {
-      const { suppliers } = await api.parseExcel(file);
-      setSuppliers(suppliers);
-      setSelected(suppliers[0].sheet);
-      setSupplierName(suppliers[0].sheet);
+      const buf = await file.arrayBuffer();
+      const found = parseWorkbook(buf);
+      if (!found.length) {
+        throw new Error(
+          'No se detectaron hojas de proveedor (con "Descripción Parte" y una columna "Cajon <Proveedor>").'
+        );
+      }
+      setSuppliers(found);
+      setSelected(found[0].sheet);
+      setSupplierName(found[0].sheet);
       setStep(2);
     } catch (err) {
       setError(err.message);
@@ -232,7 +246,7 @@ function ImportWizard({ onCreated }) {
         period: period.trim(),
         items: current.items,
       });
-      setCreatedLink(`${window.location.origin}/c/${token}`);
+      setCreatedLink(supplierLink(token));
       setStep(3);
       onCreated();
     } catch (err) {

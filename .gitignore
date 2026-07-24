@@ -1,10 +1,6 @@
 node_modules/
 dist/
-server/public/
-data/
-*.sqlite
-*.sqlite3
-*.db
-.env
 .DS_Store
 npm-debug.log*
+.env
+.vite/

@@ -1,83 +1,76 @@
 # Control de Proveedores
 
-App web para controlar el stock que la empresa tiene en poder de sus **proveedores
-de servicios** (cromado, niquelado, zincado, etc.).
+Página web (GitHub Pages) para controlar el stock que la empresa tiene en poder
+de sus **proveedores de servicios** (cromado, niquelado, zincado, etc.).
 
-El flujo es:
+Flujo:
 
-1. **El admin** sube el Excel mensual (ej. `Control_Partes_Prov_de_Servicios_JULIO.xlsx`).
-2. La app detecta las hojas de cada proveedor y extrae, para el que elijas
-   (ej. **Pedernera**), la **Descripción Parte** y el **Stock Online** (cajones + kg)
-   que la empresa cree que ese proveedor tiene.
-3. Se genera un **link único** por proveedor.
-4. **El proveedor** entra al link (sin usuario/contraseña) y, pieza por pieza,
+1. **El admin** entra al panel, sube el Excel mensual y elige un proveedor
+   (ej. **Pedernera**). La app extrae la **Descripción Parte** y el **Stock
+   Online** (cajones + kg) de esa hoja.
+2. Genera un **link único** por proveedor.
+3. **El proveedor** abre el link (sin usuario/contraseña) y, pieza por pieza,
    marca **Correcto** o **Incorrecto**. Si es **Incorrecto**, carga cuánto tiene
    realmente, separado en **sin procesar** (crudo) y **procesado**, en cajones y kg.
-5. **El admin** ve los resultados, las diferencias y **exporta un CSV**.
+4. **El admin** ve los resultados, las diferencias y **exporta un CSV**.
 
-## Tecnología
+## Arquitectura
 
-- Backend: **Node.js + Express + SQLite** (`better-sqlite3`).
-- Lectura de Excel: **SheetJS (`xlsx`)** en el servidor.
-- Frontend: **React** (Vite), servido por el mismo servidor.
-- Un solo proceso: fácil de hostear (Railway, Render, Fly.io, VPS, etc.).
+- **Frontend estático** (React + Vite), hosteado en **GitHub Pages**.
+- **Backend = Supabase** (Postgres) del proyecto *Control Partes Talleristas*.
+- El Excel se lee **en el navegador** (SheetJS); no se sube a ningún servidor.
+- Datos en **tablas aisladas con prefijo `cp_`** (`cp_sessions`, `cp_items`,
+  `cp_config`). **No tocan ninguna otra tabla** de la base.
+- Todo el acceso pasa por **funciones RPC `cp_*`** (`SECURITY DEFINER`). Las
+  tablas tienen RLS activada y **sin políticas**, así que la clave pública del
+  frontend no puede leerlas directamente: el proveedor solo accede con su
+  **token** y el admin con una **clave** que se valida del lado de la base.
 
-## Correr localmente
+## Publicar en GitHub Pages
+
+1. En GitHub: **Settings → Pages → Build and deployment → Source: GitHub Actions**.
+2. Cada push a la rama del proyecto (o a `main`) dispara el workflow
+   `.github/workflows/deploy.yml`, que compila y publica.
+3. La app queda en:
+   **https://loekemeyer.github.io/contrlol-proveedores/**
+
+> Si cambia el nombre del repo, actualizá `base` en `vite.config.js`
+> (debe ser `/<nombre-del-repo>/`).
+
+## Acceso admin
+
+La clave del admin se guarda en Supabase (tabla `cp_config`, key `admin_secret`).
+Para cambiarla:
+
+```sql
+update public.cp_config set value = 'NUEVA_CLAVE' where key = 'admin_secret';
+```
+
+## Desarrollo local
 
 ```bash
 npm install
-cp .env.example .env      # editá ADMIN_PASSWORD
-npm run build             # compila el frontend a server/public
-npm start                 # servidor en http://localhost:3000
+npm run dev       # http://localhost:5173/contrlol-proveedores/
 ```
 
-Abrí <http://localhost:3000/admin>, ingresá con `ADMIN_PASSWORD` y subí el Excel.
+La configuración de Supabase (URL + clave pública) está en
+`client/src/config.js`. La clave *publishable* es pública por diseño; la
+seguridad la dan RLS + las funciones RPC.
 
-### Desarrollo (con recarga)
+## Base de datos (resumen del esquema aislado)
 
-En dos terminales:
+- `cp_sessions` — un conteo por proveedor (con `token` y `status`).
+- `cp_items` — items del conteo (descripción, stock online) + respuesta del
+  proveedor (`estado`, `sp_*` sin procesar, `pr_*` procesado, `comentario`).
+- `cp_config` — configuración (`admin_secret`).
+- Funciones: `cp_admin_login`, `cp_admin_create_session`,
+  `cp_admin_list_sessions`, `cp_admin_get_session`, `cp_admin_delete_session`,
+  `cp_get`, `cp_save`, `cp_submit`.
 
-```bash
-npm run dev:server        # API en :3000
-npm run dev:client        # Vite en :5173 (proxy /api -> :3000)
-```
+La migración completa está en `supabase/migrations/`.
 
-## Variables de entorno
+## Rutas (HashRouter)
 
-| Variable          | Descripción                                             | Default                  |
-| ----------------- | ------------------------------------------------------- | ------------------------ |
-| `PORT`            | Puerto del servidor                                     | `3000`                   |
-| `ADMIN_PASSWORD`  | Contraseña del panel de administración                  | `admin` (¡cambiala!)     |
-| `DB_PATH`         | Ruta del archivo SQLite                                 | `./data/control.sqlite`  |
-
-## Deploy (como página web)
-
-1. Subí el repo a un servicio con Node (Railway / Render / Fly.io / VPS).
-2. Configurá `ADMIN_PASSWORD` (y un disco persistente para `DB_PATH` si el
-   servicio usa filesystem efímero).
-3. Build command: `npm install && npm run build`. Start command: `npm start`.
-4. Los links de proveedor usan el dominio desde el que se abre el panel, así que
-   funcionan automáticamente en producción.
-
-## Cómo lee el Excel
-
-Cada proveedor tiene su hoja. La app detecta automáticamente:
-
-- La fila de encabezado que contiene **`Descripción Parte`** (puede variar entre
-  hojas; ej. fila 3 en Pedernera, fila 4 en Guazzaroni).
-- Las columnas de stock online: la que empieza con **`Cajon <Proveedor>`** y la de
-  **`KG <Proveedor>`** que está pegada a la derecha.
-
-Las hojas utilitarias (`Conteo SP`, `Conteo SC`, `Stock OnLine Gral`, `Est LK`,
-etc.) se ignoran.
-
-## Rutas
-
-- `/admin` — panel: login, subir Excel, generar conteos, ver la lista.
-- `/admin/resultados/:id` — detalle de un conteo + exportar CSV.
-- `/c/:token` — pantalla del proveedor (link que se le comparte).
-
-## Datos
-
-La base es un archivo SQLite (`data/control.sqlite`). Para hacer backup, copiá ese
-archivo. Para empezar de cero, borralo (se recrea solo).
+- `#/admin` — panel: login, subir Excel, generar conteos, ver la lista.
+- `#/admin/resultados/:id` — detalle de un conteo + exportar CSV.
+- `#/c/:token` — pantalla del proveedor (link que se comparte).

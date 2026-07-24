@@ -1,103 +1,68 @@
-// Cliente HTTP simple para la API.
+// Capa de acceso a datos: llama a las funciones RPC cp_* de Supabase.
+import { supabase } from './supabaseClient.js';
 
-const PASS_KEY = 'admin_password';
+const SECRET_KEY = 'cp_admin_secret';
 
-export function getAdminPassword() {
-  return localStorage.getItem(PASS_KEY) || '';
+export function getAdminSecret() {
+  return localStorage.getItem(SECRET_KEY) || '';
 }
-export function setAdminPassword(p) {
-  localStorage.setItem(PASS_KEY, p);
+export function setAdminSecret(s) {
+  localStorage.setItem(SECRET_KEY, s);
 }
-export function clearAdminPassword() {
-  localStorage.removeItem(PASS_KEY);
+export function clearAdminSecret() {
+  localStorage.removeItem(SECRET_KEY);
 }
 
-async function handle(res) {
-  const text = await res.text();
-  let data = null;
+async function rpc(fn, args) {
+  let res;
   try {
-    data = text ? JSON.parse(text) : null;
-  } catch {
-    data = { error: text };
+    res = await supabase.rpc(fn, args);
+  } catch (e) {
+    throw new Error('No se pudo conectar. Revisá tu conexión a internet.');
   }
-  if (!res.ok) {
-    const err = new Error((data && data.error) || 'Error ' + res.status);
-    err.status = res.status;
-    throw err;
+  const { data, error } = res;
+  if (error) {
+    if (/fetch|network|failed to/i.test(error.message || '')) {
+      throw new Error('No se pudo conectar. Revisá tu conexión a internet.');
+    }
+    throw new Error(error.message || 'Error');
   }
   return data;
 }
 
-function adminHeaders(extra = {}) {
-  return { 'x-admin-password': getAdminPassword(), ...extra };
-}
-
 export const api = {
-  // Admin
-  async login(password) {
-    const res = await fetch('/api/admin/login', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ password }),
+  // ---- Admin ----
+  async login(secret) {
+    const ok = await rpc('cp_admin_login', { p_secret: secret });
+    if (!ok) throw new Error('Clave incorrecta');
+    return true;
+  },
+  createSession({ supplier_name, period, items }) {
+    return rpc('cp_admin_create_session', {
+      p_secret: getAdminSecret(),
+      p_supplier: supplier_name,
+      p_period: period || '',
+      p_items: items,
     });
-    return handle(res);
   },
-  async parseExcel(file) {
-    const fd = new FormData();
-    fd.append('file', file);
-    const res = await fetch('/api/admin/parse', {
-      method: 'POST',
-      headers: adminHeaders(),
-      body: fd,
-    });
-    return handle(res);
+  listSessions() {
+    return rpc('cp_admin_list_sessions', { p_secret: getAdminSecret() });
   },
-  async createSession(payload) {
-    const res = await fetch('/api/admin/sessions', {
-      method: 'POST',
-      headers: adminHeaders({ 'Content-Type': 'application/json' }),
-      body: JSON.stringify(payload),
-    });
-    return handle(res);
+  getSession(id) {
+    return rpc('cp_admin_get_session', { p_secret: getAdminSecret(), p_id: id });
   },
-  async listSessions() {
-    const res = await fetch('/api/admin/sessions', { headers: adminHeaders() });
-    return handle(res);
-  },
-  async getSession(id) {
-    const res = await fetch('/api/admin/sessions/' + id, { headers: adminHeaders() });
-    return handle(res);
-  },
-  async deleteSession(id) {
-    const res = await fetch('/api/admin/sessions/' + id, {
-      method: 'DELETE',
-      headers: adminHeaders(),
-    });
-    return handle(res);
-  },
-  async exportCsv(id) {
-    const res = await fetch('/api/admin/sessions/' + id + '/export.csv', {
-      headers: adminHeaders(),
-    });
-    if (!res.ok) throw new Error('No se pudo exportar');
-    return res.blob();
+  deleteSession(id) {
+    return rpc('cp_admin_delete_session', { p_secret: getAdminSecret(), p_id: id });
   },
 
-  // Proveedor
-  async getSupplierSession(token) {
-    const res = await fetch('/api/c/' + token);
-    return handle(res);
+  // ---- Proveedor (por token) ----
+  getSupplierSession(token) {
+    return rpc('cp_get', { p_token: token });
   },
-  async saveResponse(token, itemId, payload) {
-    const res = await fetch(`/api/c/${token}/items/${itemId}`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload),
-    });
-    return handle(res);
+  saveResponse(token, itemId, patch) {
+    return rpc('cp_save', { p_token: token, p_item_id: itemId, p_patch: patch });
   },
-  async submit(token) {
-    const res = await fetch(`/api/c/${token}/submit`, { method: 'POST' });
-    return handle(res);
+  submit(token) {
+    return rpc('cp_submit', { p_token: token });
   },
 };
