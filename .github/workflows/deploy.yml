@@ -25,10 +25,6 @@ jobs:
         with:
           node-version: 20
           cache: npm
-      - name: Configurar Pages (habilita Pages si hace falta)
-        uses: actions/configure-pages@v5
-        with:
-          enablement: true
       - run: npm ci
       - run: npm run build
       - uses: actions/upload-pages-artifact@v3
