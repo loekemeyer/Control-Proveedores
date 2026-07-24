@@ -1,0 +1,27 @@
+{
+  "name": "control-proveedores",
+  "version": "1.0.0",
+  "description": "App de control de stock con proveedores de servicios (procesado): el proveedor confirma item por item el stock online y, si es incorrecto, carga cuanto tiene sin procesar y procesado.",
+  "type": "module",
+  "scripts": {
+    "dev:client": "vite",
+    "dev:server": "node --watch server/index.js",
+    "build": "vite build",
+    "start": "node server/index.js",
+    "postinstall": ""
+  },
+  "dependencies": {
+    "better-sqlite3": "^11.10.0",
+    "express": "^4.21.2",
+    "multer": "^1.4.5-lts.1",
+    "nanoid": "^5.1.5",
+    "xlsx": "^0.18.5"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-react": "^4.3.4",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "react-router-dom": "^6.28.1",
+    "vite": "^6.0.7"
+  }
+}
